@@ -1,0 +1,41 @@
+server:
+  port: 9000
+  readTimeout: 30s
+  writeTimeout: 30s
+  shutdownTimeout: 10s
+
+redis:
+  addr: localhost:6379
+
+jwt:
+  enabled: true
+  authUrl: http://localhost:9060
+  issuer: birbank-business
+  audience: birbank-business
+
+routes:
+  - id: ms-auth
+    pathPrefix: /w/auth
+    upstream: http://localhost:9060
+    stripPrefix: 1
+
+  - id: ms-dictionary
+    pathPrefix: /w/dictionary
+    upstream: http://localhost:9061
+    stripPrefix: 1
+
+rateLimit:
+  rate: 100
+  window: 1s
+
+circuitBreaker:
+  maxRequests: 5
+  interval: 60s
+  timeout: 5s
+  failureRatio: 0.5
+  windowSize: 100
+
+bypassPaths:
+  - /actuator
+  - /w/auth/otp
+  - /w/auth/login
