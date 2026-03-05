@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -e
+
+COVERAGE_THRESHOLD=90
+
+echo "Running unit tests with coverage..."
+go test ./... -coverprofile=cover.out -count=1 -timeout 60s
+
+COVERAGE=$(go tool cover -func=cover.out | grep '^total:' | awk '{print $3}' | tr -d '%')
+
+rm -f cover.out
+
+echo "Total coverage: ${COVERAGE}%"
+
+COVERAGE_INT=$(echo "$COVERAGE" | cut -d. -f1)
+
+if [ "$COVERAGE_INT" -lt "$COVERAGE_THRESHOLD" ]; then
+  echo "FAIL: Coverage ${COVERAGE}% is below the ${COVERAGE_THRESHOLD}% threshold."
+  exit 1
+fi
+
+echo "OK: Coverage ${COVERAGE}% meets the ${COVERAGE_THRESHOLD}% threshold."

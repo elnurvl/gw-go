@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+MSG=$(head -1 "$1")
+PATTERN='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-zA-Z0-9_-]+\))?: .+'
+
+if ! echo "$MSG" | grep -Eq "$PATTERN"; then
+  echo "ERROR: Commit message does not follow Conventional Commits."
+  echo "  Expected: <type>(<optional scope>): <description>"
+  echo "  Types: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test"
+  echo "  Got: $MSG"
+  exit 1
+fi
