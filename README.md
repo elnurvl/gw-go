@@ -1,3 +1,6 @@
+[![Build](https://github.com/elnurvl/gw-go/actions/workflows/build.yml/badge.svg)](https://github.com/elnurvl/gw-go/actions/workflows/build.yml)
+[![codecov](https://codecov.io/gh/elnurvl/gw-go/graph/badge.svg)](https://codecov.io/gh/elnurvl/gw-go)
+
 # API Gateway
 
 A reverse proxy that routes requests to backend microservices with JWT authentication, Redis-based rate limiting, and per-route circuit breaking.

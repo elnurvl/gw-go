@@ -1,21 +1,10 @@
 package main
 
 import (
-	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
-
-func redisAddr() string {
-	if v := os.Getenv("REDIS_ADDR"); v != "" {
-		return v
-	}
-	return "localhost:6379"
-}
 
 func TestRun_InvalidConfigPath(t *testing.T) {
 	err := run("/nonexistent/config.yaml")
@@ -25,23 +14,14 @@ func TestRun_InvalidConfigPath(t *testing.T) {
 }
 
 func TestRun_ValidConfig_GracefulShutdown(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{Addr: redisAddr(), DB: 14})
-	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		t.Skipf("redis unavailable: %v", err)
-	}
-	defer func() {
-		rdb.FlushDB(context.Background())
-		rdb.Close()
-	}()
-
-	cfgYAML := fmt.Sprintf(`
+	cfgYAML := `
 server:
   port: 0
   readTimeout: 1s
   writeTimeout: 1s
   shutdownTimeout: 1s
 redis:
-  addr: %s
+  addr: localhost:6379
   db: 14
 jwt:
   enabled: false
@@ -55,7 +35,7 @@ circuitBreaker:
   timeout: 5s
   failureRatio: 0.5
   windowSize: 100
-`, redisAddr())
+`
 
 	dir := t.TempDir()
 	cfgPath := dir + "/config.yaml"

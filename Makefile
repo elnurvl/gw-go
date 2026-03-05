@@ -13,7 +13,7 @@ test-integration:
 	go test -tags=integration ./... -count=1 -timeout 60s
 
 coverage:
-	go test ./... -coverprofile=cover.out -count=1
+	go test ./... -race -coverprofile=coverage.out -covermode=atomic -count=1 -timeout 60s
 	go tool cover -func=cover.out
 	go tool cover -html=cover.out
 

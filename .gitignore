@@ -30,3 +30,6 @@ vendor/
 .roo
 .trae
 .windsurf
+
+# CI/CD
+!.github/workflows/
