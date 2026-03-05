@@ -180,6 +180,26 @@ func TestShouldBypass(t *testing.T) {
 	}
 }
 
+func TestShouldBypass_Exclusion(t *testing.T) {
+	a := &Auth{bypass: []string{"!/w/auth/user-info", "/w/auth/"}}
+
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"/w/auth/login", true},
+		{"/w/auth/otp", true},
+		{"/w/auth/user-info", false},
+		{"/w/auth/user-info/details", false},
+		{"/api/private", false},
+	}
+	for _, tt := range tests {
+		if got := a.shouldBypass(tt.path); got != tt.want {
+			t.Errorf("shouldBypass(%q) = %v, want %v", tt.path, got, tt.want)
+		}
+	}
+}
+
 func TestNewAuth_MissingJwksPath(t *testing.T) {
 	cfg := config.JWT{Enabled: true, AuthURL: "http://localhost:9060"}
 	_, err := NewAuth(cfg, newMockRedis(), nil)

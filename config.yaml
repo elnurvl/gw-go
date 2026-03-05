@@ -47,5 +47,5 @@ circuitBreaker:
 
 bypassPaths:
   - /actuator
-  - /w/auth/otp
-  - /w/auth/login
+  - /w/auth/
+  - "!/w/auth/user-info"

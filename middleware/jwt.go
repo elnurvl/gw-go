@@ -128,7 +128,14 @@ func (a *Auth) checkRevoked(ctx context.Context, sessionID string) error {
 
 func (a *Auth) shouldBypass(path string) bool {
 	for _, p := range a.bypass {
-		if strings.HasPrefix(path, p) {
+		if ex, ok := strings.CutPrefix(p, "!"); ok {
+			if strings.HasPrefix(path, ex) {
+				return false
+			}
+		}
+	}
+	for _, p := range a.bypass {
+		if !strings.HasPrefix(p, "!") && strings.HasPrefix(path, p) {
 			return true
 		}
 	}
