@@ -1,18 +1,18 @@
 server:
-  port: 9000
+  port: ${GW_PORT}
   readTimeout: 30s
   writeTimeout: 30s
   shutdownTimeout: 10s
 
 redis:
-  addr: localhost:6379
+  addr: ${REDIS_ADDR}
 
 jwt:
   enabled: true
-  authUrl: http://localhost:9060
+  authUrl: ${AUTH_URL}
   jwksPath: /auth/public-keys
-  issuer: birbank-business
-  audience: birbank-business
+  issuer: ${AUTH_URL}
+  audience: ${AUDIENCE}
   validMethods:
     - RS256
   sessionKeyPrefix: "session:revoked:"
@@ -20,12 +20,7 @@ jwt:
 routes:
   - id: ms-auth
     pathPrefix: /w/auth
-    upstream: http://localhost:9060
-    stripPrefix: 1
-
-  - id: ms-dictionary
-    pathPrefix: /w/dictionary
-    upstream: http://localhost:9061
+    upstream: ${AUTH_URL}
     stripPrefix: 1
 
 rateLimit:
@@ -46,6 +41,5 @@ circuitBreaker:
   windowSize: 100
 
 bypassPaths:
-  - /actuator
   - /w/auth/
   - "!/w/auth/user-info"

@@ -1,8 +1,11 @@
 package config
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -69,16 +72,51 @@ type CircuitBreaker struct {
 }
 
 func Load(path string) (*Config, error) {
+	loadEnv(path)
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading config %s: %w", path, err)
 	}
+
+	data = expandVars(data)
 
 	cfg := defaults()
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
 	return cfg, nil
+}
+
+// loadEnv reads a .env file from the same directory as the config file
+// and sets each KEY=VALUE pair as an environment variable.
+// Missing .env or malformed lines are silently ignored.
+func loadEnv(configPath string) {
+	envPath := filepath.Join(filepath.Dir(configPath), ".env")
+	f, err := os.Open(envPath)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		os.Setenv(strings.TrimSpace(key), strings.TrimSpace(value))
+	}
+}
+
+// expandVars replaces ${VAR} placeholders in raw config bytes
+// with values from the environment.
+func expandVars(data []byte) []byte {
+	return []byte(os.Expand(string(data), os.Getenv))
 }
 
 func defaults() *Config {

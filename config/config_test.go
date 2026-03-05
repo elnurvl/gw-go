@@ -225,6 +225,62 @@ func TestLoad_InvalidYAML(t *testing.T) {
 	}
 }
 
+func TestLoad_EnvExpansion(t *testing.T) {
+	dir := t.TempDir()
+
+	env := "REDIS_ADDR=redis:6380\nAUTH_URL=http://auth:9060\n"
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(env), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	yaml := `
+redis:
+  addr: ${REDIS_ADDR}
+jwt:
+  authUrl: ${AUTH_URL}
+`
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(yaml), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.Redis.Addr != "redis:6380" {
+		t.Errorf("redis addr = %q, want redis:6380", cfg.Redis.Addr)
+	}
+	if cfg.JWT.AuthURL != "http://auth:9060" {
+		t.Errorf("jwt.authUrl = %q, want http://auth:9060", cfg.JWT.AuthURL)
+	}
+}
+
+func TestLoad_EnvExpansion_MissingVar(t *testing.T) {
+	dir := t.TempDir()
+
+	yaml := `
+redis:
+  addr: ${UNDEFINED_TEST_VAR_12345}
+`
+	path := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(path, []byte(yaml), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	os.Unsetenv("UNDEFINED_TEST_VAR_12345")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	// Undefined vars expand to empty string; default should apply
+	if cfg.Redis.Addr != "localhost:6379" {
+		t.Errorf("redis addr = %q, want localhost:6379 (default)", cfg.Redis.Addr)
+	}
+}
+
 func TestLoad_EmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "empty.yaml")
