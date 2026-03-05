@@ -377,6 +377,37 @@ func TestCBTransport_NetworkError(t *testing.T) {
 	}
 }
 
+func TestProxy_ForwardedPrefix(t *testing.T) {
+	tests := []struct {
+		name       string
+		path       string
+		wantPrefix string
+	}{
+		{"first route", "/w/auth/login", "/w/auth"},
+		{"second route", "/w/dict/words", "/w/dict"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("X-Got-Prefix", r.Header.Get("X-Forwarded-Prefix"))
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer upstream.Close()
+
+			p := New(testConfig(upstream.URL))
+
+			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			p.ServeHTTP(w, r)
+
+			if got := w.Header().Get("X-Got-Prefix"); got != tt.wantPrefix {
+				t.Errorf("X-Forwarded-Prefix = %q, want %q", got, tt.wantPrefix)
+			}
+		})
+	}
+}
+
 func TestProxy_MultipleRoutes_FirstMatch(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Got-Path", r.URL.Path)

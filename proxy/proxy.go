@@ -61,6 +61,7 @@ func New(cfg *config.Config) *Proxy {
 			Rewrite: func(pr *httputil.ProxyRequest) {
 				pr.SetURL(upstream)
 				pr.SetXForwarded()
+				pr.Out.Header.Set("X-Forwarded-Prefix", rc.PathPrefix)
 				stripPrefix(pr, rc.StripPrefix)
 			},
 			Transport:    &cbTransport{base: http.DefaultTransport, cb: cb},
