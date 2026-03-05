@@ -57,4 +57,4 @@ Logging → Recovery → RateLimit → Auth → Gateway (reverse proxy)
 
 ## Dependencies
 
-Go 1.26 | `golang-jwt/jwt/v5` | `redis/go-redis/v9` | `sony/gobreaker/v2` | `gopkg.in/yaml.v3`
+Go 1.26 | `golang-jwt/jwt/v5` | `MicahParks/keyfunc/v3` | `redis/go-redis/v9` | `go-redis/redis_rate/v10` | `sony/gobreaker/v2` | `gopkg.in/yaml.v3`

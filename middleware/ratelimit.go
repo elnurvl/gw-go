@@ -1,45 +1,51 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/go-redis/redis_rate/v10"
+	goredis "github.com/redis/go-redis/v9"
 
 	"gw-go/config"
 )
 
-var rateLimitScript = redis.NewScript(`
-local key    = KEYS[1]
-local limit  = tonumber(ARGV[1])
-local window = tonumber(ARGV[2])
+// RateLimitChecker abstracts the rate-limit check for testability.
+type RateLimitChecker interface {
+	Allow(ctx context.Context, key string, limit redis_rate.Limit) (*redis_rate.Result, error)
+}
 
-local current = redis.call("INCR", key)
-if current == 1 then
-    redis.call("PEXPIRE", key, window)
-end
+// redisRateLimiter adapts redis_rate.Limiter to the RateLimitChecker interface.
+type redisRateLimiter struct {
+	limiter *redis_rate.Limiter
+}
 
-if current > limit then
-    return 0
-end
-return 1
-`)
+func (r *redisRateLimiter) Allow(ctx context.Context, key string, limit redis_rate.Limit) (*redis_rate.Result, error) {
+	return r.limiter.Allow(ctx, key, limit)
+}
 
 type RateLimiter struct {
-	rdb        RedisClient
-	rate       int
-	window     time.Duration
+	checker    RateLimitChecker
+	limit      redis_rate.Limit
 	keyPrefix  string
 	keyHeaders []config.KeyHeader
 }
 
-func NewRateLimiter(rdb RedisClient, cfg config.RateLimit) *RateLimiter {
+func NewRateLimiter(rdb *goredis.Client, cfg config.RateLimit) *RateLimiter {
+	checker := &redisRateLimiter{limiter: redis_rate.NewLimiter(rdb)}
+	return newRateLimiterWithChecker(checker, cfg)
+}
+
+func newRateLimiterWithChecker(checker RateLimitChecker, cfg config.RateLimit) *RateLimiter {
 	return &RateLimiter{
-		rdb:        rdb,
-		rate:       cfg.Rate,
-		window:     cfg.Window,
+		checker: checker,
+		limit: redis_rate.Limit{
+			Rate:   cfg.Rate,
+			Burst:  cfg.Rate,
+			Period: cfg.Window,
+		},
 		keyPrefix:  cfg.KeyPrefix,
 		keyHeaders: cfg.KeyHeaders,
 	}
@@ -47,22 +53,18 @@ func NewRateLimiter(rdb RedisClient, cfg config.RateLimit) *RateLimiter {
 
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := rl.resolveKey(r)
+		key := rl.keyPrefix + rl.resolveKey(r)
 
-		allowed, err := rateLimitScript.Run(
-			r.Context(), rl.rdb,
-			[]string{rl.keyPrefix + key},
-			rl.rate, rl.window.Milliseconds(),
-		).Int64()
-
+		res, err := rl.checker.Allow(r.Context(), key, rl.limit)
 		if err != nil {
 			slog.Warn("rate limit check failed", "err", err)
 			next.ServeHTTP(w, r) // fail open
 			return
 		}
 
-		if allowed == 0 {
-			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(rl.window.Seconds())))
+		if res.Allowed == 0 {
+			retryAfter := res.RetryAfter
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", int(retryAfter.Seconds())))
 			writeJSON(w, http.StatusTooManyRequests, errBody("rate limit exceeded"))
 			return
 		}

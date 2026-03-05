@@ -4,6 +4,7 @@ go 1.26
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.0
+	github.com/go-redis/redis_rate/v10 v10.0.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/redis/go-redis/v9 v9.7.3
 	github.com/sony/gobreaker/v2 v2.4.0

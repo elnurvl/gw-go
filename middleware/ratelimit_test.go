@@ -1,11 +1,16 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/go-redis/redis_rate/v10"
 
 	"gw-go/config"
 )
@@ -13,6 +18,47 @@ import (
 var defaultKeyHeaders = []config.KeyHeader{
 	{Header: "X-DEVICE-ID", Prefix: "device"},
 	{Header: "USERNAME", Prefix: "user"},
+}
+
+// mockRateLimitChecker implements RateLimitChecker for unit tests.
+type mockRateLimitChecker struct {
+	mu       sync.Mutex
+	counters map[string]int
+	err      error
+}
+
+func newMockChecker() *mockRateLimitChecker {
+	return &mockRateLimitChecker{counters: make(map[string]int)}
+}
+
+func errMockChecker() *mockRateLimitChecker {
+	return &mockRateLimitChecker{
+		counters: make(map[string]int),
+		err:      errors.New("redis: connection refused"),
+	}
+}
+
+func (m *mockRateLimitChecker) Allow(_ context.Context, key string, limit redis_rate.Limit) (*redis_rate.Result, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.counters[key]++
+	remaining := limit.Rate - m.counters[key]
+	if remaining < 0 {
+		return &redis_rate.Result{
+			Allowed:    0,
+			Remaining:  0,
+			RetryAfter: limit.Period,
+		}, nil
+	}
+	return &redis_rate.Result{
+		Allowed:    1,
+		Remaining:  remaining,
+		RetryAfter: -1,
+	}, nil
 }
 
 func TestResolveKey_DeviceID(t *testing.T) {
@@ -53,19 +99,22 @@ func TestResolveKey_XForwardedFor(t *testing.T) {
 }
 
 func TestNewRateLimiter(t *testing.T) {
-	mock := newMockRedis()
+	mock := newMockChecker()
 	cfg := config.RateLimit{
 		Rate:       50,
 		Window:     2 * time.Second,
 		KeyPrefix:  "ratelimit:",
 		KeyHeaders: defaultKeyHeaders,
 	}
-	rl := NewRateLimiter(mock, cfg)
-	if rl.rate != 50 {
-		t.Errorf("rate = %d, want 50", rl.rate)
+	rl := newRateLimiterWithChecker(mock, cfg)
+	if rl.limit.Rate != 50 {
+		t.Errorf("limit.Rate = %d, want 50", rl.limit.Rate)
 	}
-	if rl.window != 2*time.Second {
-		t.Errorf("window = %v, want 2s", rl.window)
+	if rl.limit.Burst != 50 {
+		t.Errorf("limit.Burst = %d, want 50", rl.limit.Burst)
+	}
+	if rl.limit.Period != 2*time.Second {
+		t.Errorf("limit.Period = %v, want 2s", rl.limit.Period)
 	}
 	if rl.keyPrefix != "ratelimit:" {
 		t.Errorf("keyPrefix = %q, want ratelimit:", rl.keyPrefix)
@@ -76,9 +125,9 @@ func TestNewRateLimiter(t *testing.T) {
 }
 
 func TestRateLimiter_AllowsWithinLimit(t *testing.T) {
-	mock := newMockRedis()
+	mock := newMockChecker()
 	cfg := config.RateLimit{Rate: 5, Window: 10 * time.Second, KeyPrefix: "ratelimit:", KeyHeaders: defaultKeyHeaders}
-	rl := NewRateLimiter(mock, cfg)
+	rl := newRateLimiterWithChecker(mock, cfg)
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -97,9 +146,9 @@ func TestRateLimiter_AllowsWithinLimit(t *testing.T) {
 }
 
 func TestRateLimiter_BlocksOverLimit(t *testing.T) {
-	mock := newMockRedis()
+	mock := newMockChecker()
 	cfg := config.RateLimit{Rate: 3, Window: 10 * time.Second, KeyPrefix: "ratelimit:", KeyHeaders: defaultKeyHeaders}
-	rl := NewRateLimiter(mock, cfg)
+	rl := newRateLimiterWithChecker(mock, cfg)
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -134,9 +183,9 @@ func TestRateLimiter_BlocksOverLimit(t *testing.T) {
 }
 
 func TestRateLimiter_FailOpen_RedisDown(t *testing.T) {
-	mock := errMockRedis()
+	mock := errMockChecker()
 	cfg := config.RateLimit{Rate: 1, Window: time.Second, KeyPrefix: "ratelimit:", KeyHeaders: defaultKeyHeaders}
-	rl := NewRateLimiter(mock, cfg)
+	rl := newRateLimiterWithChecker(mock, cfg)
 
 	called := false
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -158,9 +207,9 @@ func TestRateLimiter_FailOpen_RedisDown(t *testing.T) {
 }
 
 func TestRateLimiter_DifferentKeys_IndependentLimits(t *testing.T) {
-	mock := newMockRedis()
+	mock := newMockChecker()
 	cfg := config.RateLimit{Rate: 2, Window: 10 * time.Second, KeyPrefix: "ratelimit:", KeyHeaders: defaultKeyHeaders}
-	rl := NewRateLimiter(mock, cfg)
+	rl := newRateLimiterWithChecker(mock, cfg)
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -12,7 +12,6 @@ import (
 
 // RedisClient abstracts the Redis operations used by middleware.
 type RedisClient interface {
-	redis.Scripter
 	Exists(ctx context.Context, keys ...string) *redis.IntCmd
 }
 

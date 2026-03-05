@@ -6,7 +6,7 @@ A reverse proxy that routes requests to backend microservices with JWT authentic
 
 - **Reverse proxy** with prefix-based routing and path stripping
 - **JWT authentication** via RS256/JWKS with session revocation checks
-- **Rate limiting** using atomic Redis Lua scripts (fixed-window, keyed by device ID / username / IP)
+- **Rate limiting** via [redis_rate](https://github.com/go-redis/redis_rate) (keyed by device ID / username / IP)
 - **Circuit breaking** per upstream route (powered by [gobreaker](https://github.com/sony/gobreaker))
 - **Header enrichment** — forwards JWT claims as `X-USER-ID`, `X-USERNAME`, `X-CUSTOMER-ID`, etc.
 - **Graceful shutdown** on SIGINT/SIGTERM
@@ -72,7 +72,7 @@ Client → Logging → Recovery → RateLimit → Auth → Proxy → Upstream Se
 ```
 
 1. **Logging** — logs method, path, status, and duration for every request; recovers from panics.
-2. **Rate Limiter** — fixed-window counter in Redis. Identifies clients by `X-DEVICE-ID` header, then `USERNAME` header, then IP address.
+2. **Rate Limiter** — token-bucket rate limiter backed by Redis. Identifies clients by `X-DEVICE-ID` header, then `USERNAME` header, then IP address.
 3. **Auth** — validates JWT (RS256 via JWKS endpoint), checks session revocation in Redis. Paths listed in `bypassPaths` skip authentication.
 4. **Proxy** — matches request path to a route by longest prefix, strips configured path segments, enriches upstream request with JWT claim headers, and forwards via `httputil.ReverseProxy`.
 
@@ -94,5 +94,6 @@ All settings are defined in `config.yaml` — server port, Redis connection, JWT
 | [golang-jwt/jwt/v5](https://github.com/golang-jwt/jwt) | JWT parsing and validation  |
 | [MicahParks/keyfunc/v3](https://github.com/MicahParks/keyfunc) | JWKS key management         |
 | [redis/go-redis/v9](https://github.com/redis/go-redis) | Redis client                |
+| [go-redis/redis_rate/v10](https://github.com/go-redis/redis_rate) | Redis-based rate limiting   |
 | [sony/gobreaker/v2](https://github.com/sony/gobreaker) | Circuit breaker             |
 | [gopkg.in/yaml.v3](https://github.com/go-yaml/yaml) | YAML config parsing         |

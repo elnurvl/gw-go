@@ -15,16 +15,14 @@ import (
 // --- mock Redis ---
 
 type mockRedis struct {
-	mu       sync.Mutex
-	counters map[string]int64 // rate limit counters per key
-	keys     map[string]bool  // existing keys for Exists checks
-	err      error            // if set, all operations return this error
+	mu   sync.Mutex
+	keys map[string]bool // existing keys for Exists checks
+	err  error           // if set, all operations return this error
 }
 
 func newMockRedis() *mockRedis {
 	return &mockRedis{
-		counters: make(map[string]int64),
-		keys:     make(map[string]bool),
+		keys: make(map[string]bool),
 	}
 }
 
@@ -46,61 +44,11 @@ func (m *mockRedis) Exists(ctx context.Context, keys ...string) *redis.IntCmd {
 	return cmd
 }
 
-func (m *mockRedis) Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd {
-	cmd := redis.NewCmd(ctx)
-	if m.err != nil {
-		cmd.SetErr(m.err)
-		return cmd
-	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	key := keys[0]
-	var limit int64
-	switch v := args[0].(type) {
-	case int:
-		limit = int64(v)
-	case int64:
-		limit = v
-	}
-
-	m.counters[key]++
-	if m.counters[key] > limit {
-		cmd.SetVal(int64(0))
-	} else {
-		cmd.SetVal(int64(1))
-	}
-	return cmd
-}
-
-func (m *mockRedis) EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd {
-	return m.Eval(ctx, "", keys, args...)
-}
-
-func (m *mockRedis) EvalRO(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd {
-	return m.Eval(ctx, script, keys, args...)
-}
-
-func (m *mockRedis) EvalShaRO(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd {
-	return m.Eval(ctx, "", keys, args...)
-}
-
-func (m *mockRedis) ScriptExists(ctx context.Context, hashes ...string) *redis.BoolSliceCmd {
-	cmd := redis.NewBoolSliceCmd(ctx)
-	return cmd
-}
-
-func (m *mockRedis) ScriptLoad(ctx context.Context, script string) *redis.StringCmd {
-	cmd := redis.NewStringCmd(ctx)
-	return cmd
-}
-
 // errMockRedis returns a mock where all operations fail.
 func errMockRedis() *mockRedis {
 	return &mockRedis{
-		counters: make(map[string]int64),
-		keys:     make(map[string]bool),
-		err:      errors.New("redis: connection refused"),
+		keys: make(map[string]bool),
+		err:  errors.New("redis: connection refused"),
 	}
 }
 
