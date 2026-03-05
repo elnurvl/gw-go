@@ -82,7 +82,7 @@ func signToken(t *testing.T, key *rsa.PrivateKey, claims Claims) string {
 func validClaims() Claims {
 	now := time.Now()
 	return Claims{
-		UserID:   "u-123",
+		UserID:   123,
 		Username: "testuser",
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "test-issuer",
@@ -124,13 +124,13 @@ func TestClaimsFromContext_Nil(t *testing.T) {
 }
 
 func TestClaimsFromContext_WithClaims(t *testing.T) {
-	claims := &Claims{UserID: "u-42", Username: "alice"}
+	claims := &Claims{UserID: 42, Username: "alice"}
 	ctx := context.WithValue(context.Background(), claimsCtxKey, claims)
 	got := ClaimsFromContext(ctx)
 	if got == nil {
 		t.Fatal("expected claims, got nil")
 	}
-	if got.UserID != "u-42" || got.Username != "alice" {
+	if got.UserID != 42 || got.Username != "alice" {
 		t.Errorf("claims = %+v", got)
 	}
 }
@@ -297,8 +297,8 @@ func TestAuth_ValidToken(t *testing.T) {
 	if gotClaims == nil {
 		t.Fatal("claims not found in context")
 	}
-	if gotClaims.UserID != "u-123" {
-		t.Errorf("userId = %q, want u-123", gotClaims.UserID)
+	if gotClaims.UserID != 123 {
+		t.Errorf("userId = %d, want 123", gotClaims.UserID)
 	}
 	if gotClaims.Username != "testuser" {
 		t.Errorf("username = %q, want testuser", gotClaims.Username)
@@ -473,12 +473,12 @@ func TestAuth_TokenWithAllClaims(t *testing.T) {
 	handler := auth.Middleware(inner)
 
 	claims := validClaims()
-	claims.CustomerID = "cust-1"
+	claims.CustomerID = 1
 	claims.CustomerType = "premium"
 	claims.CIF = "CIF001"
 	claims.TIN = "TIN001"
 	claims.AuthType = "password"
-	claims.SignatureLevel = "high"
+	claims.SignatureLevel = 3
 	claims.Phone = "+994501234567"
 	claims.AsanID = "asan-1"
 	claims.GoogleKey = "gkey-1"
@@ -496,22 +496,28 @@ func TestAuth_TokenWithAllClaims(t *testing.T) {
 	if gotClaims == nil {
 		t.Fatal("claims nil")
 	}
-	checks := []struct {
+	if gotClaims.UserID != 123 {
+		t.Errorf("UserID = %d, want 123", gotClaims.UserID)
+	}
+	if gotClaims.CustomerID != 1 {
+		t.Errorf("CustomerID = %d, want 1", gotClaims.CustomerID)
+	}
+	if gotClaims.SignatureLevel != 3 {
+		t.Errorf("SignatureLevel = %d, want 3", gotClaims.SignatureLevel)
+	}
+	stringChecks := []struct {
 		field, got, want string
 	}{
-		{"UserID", gotClaims.UserID, "u-123"},
 		{"Username", gotClaims.Username, "testuser"},
-		{"CustomerID", gotClaims.CustomerID, "cust-1"},
 		{"CustomerType", gotClaims.CustomerType, "premium"},
 		{"CIF", gotClaims.CIF, "CIF001"},
 		{"TIN", gotClaims.TIN, "TIN001"},
 		{"AuthType", gotClaims.AuthType, "password"},
-		{"SignatureLevel", gotClaims.SignatureLevel, "high"},
 		{"Phone", gotClaims.Phone, "+994501234567"},
 		{"AsanID", gotClaims.AsanID, "asan-1"},
 		{"GoogleKey", gotClaims.GoogleKey, "gkey-1"},
 	}
-	for _, c := range checks {
+	for _, c := range stringChecks {
 		if c.got != c.want {
 			t.Errorf("%s = %q, want %q", c.field, c.got, c.want)
 		}
@@ -519,14 +525,14 @@ func TestAuth_TokenWithAllClaims(t *testing.T) {
 }
 
 func TestContextWithClaims(t *testing.T) {
-	claims := &Claims{UserID: "u-99", Username: "bob"}
+	claims := &Claims{UserID: 99, Username: "bob"}
 	ctx := ContextWithClaims(context.Background(), claims)
 	got := ClaimsFromContext(ctx)
 	if got == nil {
 		t.Fatal("expected claims from context")
 	}
-	if got.UserID != "u-99" {
-		t.Errorf("UserID = %q, want u-99", got.UserID)
+	if got.UserID != 99 {
+		t.Errorf("UserID = %d, want 99", got.UserID)
 	}
 }
 

@@ -173,9 +173,9 @@ func signMSAuthToken(t *testing.T, key *rsa.PrivateKey, sessionID string) string
 	t.Helper()
 	now := time.Now()
 	claims := middleware.Claims{
-		UserID:       "999",
+		UserID:       999,
 		Username:     "integration-test",
-		CustomerID:   "1",
+		CustomerID:   1,
 		CustomerType: "JURIDICAL",
 		CIF:          "0000001",
 		TIN:          "9999999999",

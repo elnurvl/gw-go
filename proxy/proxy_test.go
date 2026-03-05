@@ -119,14 +119,14 @@ func TestProxy_EnrichHeaders(t *testing.T) {
 	p := New(testConfig(upstream.URL))
 
 	claims := &middleware.Claims{
-		UserID:         "u-1",
+		UserID:         1,
 		Username:       "alice",
-		CustomerID:     "c-1",
+		CustomerID:     1,
 		CustomerType:   "business",
 		CIF:            "CIF-001",
 		TIN:            "TIN-001",
 		AuthType:       "sms",
-		SignatureLevel: "qualified",
+		SignatureLevel: 1,
 		Phone:          "+994551234567",
 		AsanID:         "asan-1",
 		GoogleKey:      "gkey-1",
@@ -146,14 +146,14 @@ func TestProxy_EnrichHeaders(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &headers)
 
 	expected := map[string]string{
-		"X-USER-ID":         "u-1",
+		"X-USER-ID":         "1",
 		"X-USERNAME":        "alice",
-		"X-CUSTOMER-ID":     "c-1",
+		"X-CUSTOMER-ID":     "1",
 		"X-CUSTOMER-TYPE":   "business",
 		"X-CIF":             "CIF-001",
 		"X-TIN":             "TIN-001",
 		"X-AUTH-TYPE":       "sms",
-		"X-SIGNATURE-LEVEL": "qualified",
+		"X-SIGNATURE-LEVEL": "1",
 		"X-PHONE":           "+994551234567",
 		"X-ASAN-ID":         "asan-1",
 		"X-GOOGLE-KEY":      "gkey-1",

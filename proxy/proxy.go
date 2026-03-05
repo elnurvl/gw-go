@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/sony/gobreaker/v2"
@@ -114,14 +115,20 @@ func enrichHeaders(r *http.Request) {
 		}
 	}
 
-	set("X-USER-ID", claims.UserID)
+	setInt := func(key string, val int64) {
+		if val != 0 {
+			h.Set(key, strconv.FormatInt(val, 10))
+		}
+	}
+
+	setInt("X-USER-ID", claims.UserID)
 	set("X-USERNAME", claims.Username)
-	set("X-CUSTOMER-ID", claims.CustomerID)
+	setInt("X-CUSTOMER-ID", claims.CustomerID)
 	set("X-CUSTOMER-TYPE", claims.CustomerType)
 	set("X-CIF", claims.CIF)
 	set("X-TIN", claims.TIN)
 	set("X-AUTH-TYPE", claims.AuthType)
-	set("X-SIGNATURE-LEVEL", claims.SignatureLevel)
+	set("X-SIGNATURE-LEVEL", strconv.Itoa(claims.SignatureLevel))
 	set("X-PHONE", claims.Phone)
 	set("X-ASAN-ID", claims.AsanID)
 	set("X-GOOGLE-KEY", claims.GoogleKey)

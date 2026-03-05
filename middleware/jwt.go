@@ -19,14 +19,14 @@ const claimsCtxKey ctxKey = iota
 
 // Claims holds JWT claims mapped from the token payload.
 type Claims struct {
-	UserID         string `json:"userId"`
+	UserID         int64  `json:"userId"`
 	Username       string `json:"username"`
-	CustomerID     string `json:"customerId"`
+	CustomerID     int64  `json:"customerId"`
 	CustomerType   string `json:"customerType"`
 	CIF            string `json:"cif"`
 	TIN            string `json:"tin"`
 	AuthType       string `json:"authType"`
-	SignatureLevel string `json:"signatureLevel"`
+	SignatureLevel int    `json:"signatureLevel"`
 	Phone          string `json:"phone"`
 	AsanID         string `json:"asanId"`
 	GoogleKey      string `json:"googleKey"`
