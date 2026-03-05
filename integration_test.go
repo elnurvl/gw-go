@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	msAuthKeyID  = "main-key"
-	msAuthIssuer = "auth-service"
-	msAuthAud    = "api"
+	authServerKeyID  = "main-key"
+	authServerIssuer = "auth-service"
+	authServerAud    = "api"
 )
 
 func envOr(key, fallback string) string {
@@ -52,24 +52,24 @@ func requireRedis(t *testing.T) *redis.Client {
 	return rdb
 }
 
-func msAuthURL() string {
-	return envOr("MS_AUTH_ADDR", "http://localhost:9060")
+func authServerURL() string {
+	return envOr("AUTH_SERVER_ADDR", "http://localhost:8080")
 }
 
 func envFilePath() string {
 	return envOr("ENV_FILE_PATH", ".env")
 }
 
-func requireMSAuth(t *testing.T) {
+func requireAuthServer(t *testing.T) {
 	t.Helper()
-	addr := msAuthURL()
+	addr := authServerURL()
 	resp, err := http.Get(addr + "/auth/public-keys")
 	if err != nil {
-		t.Fatalf("ms-auth unavailable at %s: %v", addr, err)
+		t.Fatalf("Authorization Server unavailable at %s: %v", addr, err)
 	}
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("ms-auth /auth/public-keys returned %d", resp.StatusCode)
+		t.Fatalf("Authorization Server /auth/public-keys returned %d", resp.StatusCode)
 	}
 }
 
@@ -120,19 +120,19 @@ func loadPrivateKey(t *testing.T) *rsa.PrivateKey {
 func buildIntegrationGateway(t *testing.T, rdb *redis.Client) http.Handler {
 	t.Helper()
 
-	addr := msAuthURL()
+	addr := authServerURL()
 	cfg := &config.Config{
 		JWT: config.JWT{
 			Enabled:            true,
 			AuthURL:            addr,
 			JwksPath:           "/auth/public-keys",
-			Issuer:             msAuthIssuer,
-			Audience:           msAuthAud,
+			Issuer:             authServerIssuer,
+			Audience:           authServerAud,
 			ValidMethods:       []string{"RS256"},
 			RevokedTokenPrefix: "token:revoked:",
 		},
 		Routes: []config.Route{
-			{ID: "ms-auth", PathPrefix: "/w/auth", Upstream: addr, StripPrefix: 1},
+			{ID: "auth-server", PathPrefix: "/w/auth", Upstream: addr, StripPrefix: 1},
 		},
 		RateLimit: config.RateLimit{
 			Rate:      5,
@@ -169,7 +169,7 @@ func buildIntegrationGateway(t *testing.T, rdb *redis.Client) http.Handler {
 
 // --- token helpers ---
 
-func signMSAuthToken(t *testing.T, key *rsa.PrivateKey, sessionID string) string {
+func signAuthServerToken(t *testing.T, key *rsa.PrivateKey, sessionID string) string {
 	t.Helper()
 	now := time.Now()
 	claims := middleware.Claims{
@@ -183,8 +183,8 @@ func signMSAuthToken(t *testing.T, key *rsa.PrivateKey, sessionID string) string
 		Phone:        "+994501234567",
 		SessionID:    sessionID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    msAuthIssuer,
-			Audience:  jwt.ClaimStrings{msAuthAud},
+			Issuer:    authServerIssuer,
+			Audience:  jwt.ClaimStrings{authServerAud},
 			Subject:   "integration-test",
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -193,7 +193,7 @@ func signMSAuthToken(t *testing.T, key *rsa.PrivateKey, sessionID string) string
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = msAuthKeyID
+	token.Header["kid"] = authServerKeyID
 	s, err := token.SignedString(key)
 	if err != nil {
 		t.Fatal(err)
@@ -201,11 +201,11 @@ func signMSAuthToken(t *testing.T, key *rsa.PrivateKey, sessionID string) string
 	return s
 }
 
-// --- Integration Tests (real ms-auth + real Redis) ---
+// --- Integration Tests (real Authorization Server + real Redis) ---
 
 func TestIntegration_PublicKeys(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	// /w/auth/public-keys is a bypass path — no token needed
@@ -228,8 +228,8 @@ func TestIntegration_PublicKeys(t *testing.T) {
 
 	// Verify the key has expected fields
 	first := keys[0].(map[string]any)
-	if first["kid"] != msAuthKeyID {
-		t.Errorf("kid = %v, want %s", first["kid"], msAuthKeyID)
+	if first["kid"] != authServerKeyID {
+		t.Errorf("kid = %v, want %s", first["kid"], authServerKeyID)
 	}
 	if first["alg"] != "RS256" {
 		t.Errorf("alg = %v, want RS256", first["alg"])
@@ -238,12 +238,12 @@ func TestIntegration_PublicKeys(t *testing.T) {
 
 func TestIntegration_UserInfo(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	key := loadPrivateKey(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	sessionID := fmt.Sprintf("integration-%d", time.Now().UnixNano())
-	token := signMSAuthToken(t, key, sessionID)
+	token := signAuthServerToken(t, key, sessionID)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/w/auth/user-info", nil)
@@ -251,7 +251,7 @@ func TestIntegration_UserInfo(t *testing.T) {
 	handler.ServeHTTP(w, r)
 
 	// The gateway should pass the token through (not reject at gateway level).
-	// ms-auth may return any status depending on DB state, but it should NOT be
+	// Authorization Server may return any status depending on DB state, but it should NOT be
 	// the gateway's own 401 "missing authorization token" / "invalid token".
 	if w.Code == http.StatusUnauthorized {
 		var body map[string]string
@@ -261,18 +261,18 @@ func TestIntegration_UserInfo(t *testing.T) {
 		}
 	}
 
-	// Response should be JSON from ms-auth (not an HTML 404 or gateway error)
+	// Response should be JSON from Authorization Server (not an HTML 404 or gateway error)
 	ct := w.Header().Get("Content-Type")
 	if !strings.Contains(ct, "application/json") {
 		t.Errorf("Content-Type = %q, want application/json", ct)
 	}
 
-	t.Logf("/auth/user-info status=%d (response from ms-auth)", w.Code)
+	t.Logf("/auth/user-info status=%d (response from Authorization Server)", w.Code)
 }
 
 func TestIntegration_UserInfo_NoToken(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	w := httptest.NewRecorder()
@@ -291,7 +291,7 @@ func TestIntegration_UserInfo_NoToken(t *testing.T) {
 
 func TestIntegration_UserInfo_InvalidToken(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	w := httptest.NewRecorder()
@@ -306,12 +306,12 @@ func TestIntegration_UserInfo_InvalidToken(t *testing.T) {
 
 func TestIntegration_RateLimit(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	key := loadPrivateKey(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	sessionID := fmt.Sprintf("rate-%d", time.Now().UnixNano())
-	token := signMSAuthToken(t, key, sessionID)
+	token := signAuthServerToken(t, key, sessionID)
 	deviceID := fmt.Sprintf("dev-rate-%d", time.Now().UnixNano())
 
 	// Send 5 requests (at the limit)
@@ -343,7 +343,7 @@ func TestIntegration_RateLimit(t *testing.T) {
 
 func TestIntegration_RateLimit_IndependentDevices(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	ts := time.Now().UnixNano()
@@ -371,12 +371,12 @@ func TestIntegration_RateLimit_IndependentDevices(t *testing.T) {
 
 func TestIntegration_SessionRevocation(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	key := loadPrivateKey(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	sessionID := fmt.Sprintf("revoke-%d", time.Now().UnixNano())
-	token := signMSAuthToken(t, key, sessionID)
+	token := signAuthServerToken(t, key, sessionID)
 
 	// First request — not revoked, should pass gateway auth
 	w := httptest.NewRecorder()
@@ -416,12 +416,12 @@ func TestIntegration_SessionRevocation(t *testing.T) {
 
 func TestIntegration_SessionRevocation_Cleared(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	key := loadPrivateKey(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	sessionID := fmt.Sprintf("revoke-clear-%d", time.Now().UnixNano())
-	token := signMSAuthToken(t, key, sessionID)
+	token := signAuthServerToken(t, key, sessionID)
 
 	// Revoke
 	rdb.Set(context.Background(), "token:revoked:"+sessionID, "1", time.Minute)
@@ -455,12 +455,12 @@ func TestIntegration_SessionRevocation_Cleared(t *testing.T) {
 
 func TestIntegration_UnknownRoute(t *testing.T) {
 	rdb := requireRedis(t)
-	requireMSAuth(t)
+	requireAuthServer(t)
 	key := loadPrivateKey(t)
 	handler := buildIntegrationGateway(t, rdb)
 
 	sessionID := fmt.Sprintf("unknown-%d", time.Now().UnixNano())
-	token := signMSAuthToken(t, key, sessionID)
+	token := signAuthServerToken(t, key, sessionID)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/unknown/path", nil)

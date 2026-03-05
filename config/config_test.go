@@ -10,8 +10,8 @@ import (
 func TestDefaults(t *testing.T) {
 	cfg := defaults()
 
-	if cfg.Server.Port != 9000 {
-		t.Errorf("default port = %d, want 9000", cfg.Server.Port)
+	if cfg.Server.Port != 80 {
+		t.Errorf("default port = %d, want 80", cfg.Server.Port)
 	}
 	if cfg.Server.ReadTimeout != 30*time.Second {
 		t.Errorf("default readTimeout = %v, want 30s", cfg.Server.ReadTimeout)
@@ -78,7 +78,7 @@ redis:
 
 jwt:
   enabled: false
-  authUrl: http://auth:9060
+  authUrl: http://auth:8080
   issuer: test-issuer
   audience: test-audience
 
@@ -138,8 +138,8 @@ bypassPaths:
 	if cfg.JWT.Enabled {
 		t.Error("jwt.enabled = true, want false")
 	}
-	if cfg.JWT.AuthURL != "http://auth:9060" {
-		t.Errorf("jwt.authUrl = %q, want http://auth:9060", cfg.JWT.AuthURL)
+	if cfg.JWT.AuthURL != "http://auth:8080" {
+		t.Errorf("jwt.authUrl = %q, want http://auth:8080", cfg.JWT.AuthURL)
 	}
 	if cfg.JWT.Issuer != "test-issuer" {
 		t.Errorf("jwt.issuer = %q, want test-issuer", cfg.JWT.Issuer)
@@ -228,7 +228,7 @@ func TestLoad_InvalidYAML(t *testing.T) {
 func TestLoad_EnvExpansion(t *testing.T) {
 	dir := t.TempDir()
 
-	env := "REDIS_ADDR=redis:6380\nAUTH_URL=http://auth:9060\n"
+	env := "REDIS_ADDR=redis:6380\nAUTH_URL=http://auth:8080\n"
 	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte(env), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -252,8 +252,8 @@ jwt:
 	if cfg.Redis.Addr != "redis:6380" {
 		t.Errorf("redis addr = %q, want redis:6380", cfg.Redis.Addr)
 	}
-	if cfg.JWT.AuthURL != "http://auth:9060" {
-		t.Errorf("jwt.authUrl = %q, want http://auth:9060", cfg.JWT.AuthURL)
+	if cfg.JWT.AuthURL != "http://auth:8080" {
+		t.Errorf("jwt.authUrl = %q, want http://auth:8080", cfg.JWT.AuthURL)
 	}
 }
 
@@ -293,7 +293,7 @@ func TestLoad_EmptyFile(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 	// All defaults should be applied
-	if cfg.Server.Port != 9000 {
-		t.Errorf("port = %d, want 9000 (default)", cfg.Server.Port)
+	if cfg.Server.Port != 80 {
+		t.Errorf("port = %d, want 80 (default)", cfg.Server.Port)
 	}
 }

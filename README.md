@@ -21,7 +21,7 @@ A reverse proxy that routes requests to backend microservices with JWT authentic
 
 ## Getting Started
 
-### 1. Start the Authorization Server (`ms-auth`) and Redis server (comes with `ms-auth` docker-compose)
+### 1. Start the Authorization Server and Redis server
 
 ### 2. Configure environment
 
@@ -47,21 +47,21 @@ make run
 ./bin/gateway -config /path/to/config.yaml
 ```
 
-The gateway starts on the configured port (default `9000`).
+The gateway starts on the configured port (default `80`).
 
 ## Development
 
 ### Make targets
 
-| Command                | Description                                            |
-|------------------------|--------------------------------------------------------|
-| `make build`           | Build binary to `bin/gateway`                          |
-| `make run`             | Run with `go run`                                      |
-| `make test`            | Unit tests (requires Redis)                            |
-| `make test-integration`| Unit + integration tests (requires Redis and `ms-auth`)|
-| `make coverage`        | Run tests, print summary, open HTML coverage report    |
-| `make lint`            | Run golangci-lint                                      |
-| `make clean`           | Remove `bin/` directory                                |
+| Command                | Description                                                        |
+|------------------------|--------------------------------------------------------------------|
+| `make build`           | Build binary to `bin/gateway`                                      |
+| `make run`             | Run with `go run`                                                  |
+| `make test`            | Unit tests (requires Redis)                                        |
+| `make test-integration`| Unit + integration tests (requires Redis and Authorization Server) |
+| `make coverage`        | Run tests, print summary, open HTML coverage report                |
+| `make lint`            | Run golangci-lint                                                  |
+| `make clean`           | Remove `bin/` directory                                            |
 
 ## Architecture
 

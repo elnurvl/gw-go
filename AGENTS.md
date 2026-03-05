@@ -12,7 +12,7 @@ Go API Gateway — a reverse proxy that routes requests to backend microservices
 make build                  # Build binary to bin/gateway
 make run                    # Run with go run
 make test                   # Unit tests in Docker (Redis provided by compose)
-make test-integration       # All tests in Docker (ms-auth must run on host)
+make test-integration       # All tests in Docker (Authorization Server must run on host)
 make coverage               # Run tests, print summary, open HTML report
 make lint                   # golangci-lint run
 make clean                  # Remove bin/
@@ -34,7 +34,7 @@ Logging → Recovery → RateLimit → Auth → Gateway (reverse proxy)
 ```
 
 **Key packages:**
-- `config` — YAML config loading with defaults (port 9000, rate 100 req/s, circuit breaker 50% failure over 100 requests)
+- `config` — YAML config loading with defaults (port 80, rate 100 req/s, circuit breaker 50% failure over 100 requests)
 - `middleware/jwt.go` — RS256 JWT validation via JWKS endpoint, session revocation check via Redis, bypass paths for public endpoints
 - `middleware/ratelimit.go` — Fixed-window rate limiter using atomic Redis Lua script. Key priority: `X-DEVICE-ID` header → `USERNAME` header → client IP
 - `middleware/logging.go` — Request logging via `slog` + panic recovery

@@ -201,7 +201,7 @@ func TestShouldBypass_Exclusion(t *testing.T) {
 }
 
 func TestNewAuth_MissingJwksPath(t *testing.T) {
-	cfg := config.JWT{Enabled: true, AuthURL: "http://localhost:9060"}
+	cfg := config.JWT{Enabled: true, AuthURL: "http://localhost:8080"}
 	_, err := NewAuth(cfg, newMockRedis(), nil)
 	if err == nil {
 		t.Fatal("expected error for missing jwksPath")

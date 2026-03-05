@@ -122,7 +122,7 @@ func expandVars(data []byte) []byte {
 func defaults() *Config {
 	return &Config{
 		Server: Server{
-			Port:            9000,
+			Port:            80,
 			ReadTimeout:     30 * time.Second,
 			WriteTimeout:    30 * time.Second,
 			ShutdownTimeout: 10 * time.Second,

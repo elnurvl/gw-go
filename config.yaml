@@ -18,7 +18,7 @@ jwt:
   revokedTokenPrefix: "token:revoked:"
 
 routes:
-  - id: ms-auth
+  - id: auth-server
     pathPrefix: /w/auth
     upstream: ${AUTH_URL}
     stripPrefix: 1
