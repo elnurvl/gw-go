@@ -32,10 +32,13 @@ type Redis struct {
 }
 
 type JWT struct {
-	Enabled  bool   `yaml:"enabled"`
-	AuthURL  string `yaml:"authUrl"`
-	Issuer   string `yaml:"issuer"`
-	Audience string `yaml:"audience"`
+	Enabled          bool     `yaml:"enabled"`
+	AuthURL          string   `yaml:"authUrl"`
+	JwksPath         string   `yaml:"jwksPath"`
+	Issuer           string   `yaml:"issuer"`
+	Audience         string   `yaml:"audience"`
+	ValidMethods     []string `yaml:"validMethods"`
+	SessionKeyPrefix string   `yaml:"sessionKeyPrefix"`
 }
 
 type Route struct {
@@ -46,8 +49,15 @@ type Route struct {
 }
 
 type RateLimit struct {
-	Rate   int           `yaml:"rate"`
-	Window time.Duration `yaml:"window"`
+	Rate       int           `yaml:"rate"`
+	Window     time.Duration `yaml:"window"`
+	KeyPrefix  string        `yaml:"keyPrefix"`
+	KeyHeaders []KeyHeader   `yaml:"keyHeaders"`
+}
+
+type KeyHeader struct {
+	Header string `yaml:"header"`
+	Prefix string `yaml:"prefix"`
 }
 
 type CircuitBreaker struct {
@@ -80,10 +90,19 @@ func defaults() *Config {
 			ShutdownTimeout: 10 * time.Second,
 		},
 		Redis: Redis{Addr: "localhost:6379"},
-		JWT:   JWT{Enabled: true},
+		JWT: JWT{
+			Enabled:          true,
+			ValidMethods:     []string{"RS256"},
+			SessionKeyPrefix: "session:revoked:",
+		},
 		RateLimit: RateLimit{
-			Rate:   100,
-			Window: time.Second,
+			Rate:      100,
+			Window:    time.Second,
+			KeyPrefix: "ratelimit:",
+			KeyHeaders: []KeyHeader{
+				{Header: "X-DEVICE-ID", Prefix: "device"},
+				{Header: "USERNAME", Prefix: "user"},
+			},
 		},
 		CircuitBreaker: CircuitBreaker{
 			MaxRequests:  5,

@@ -10,8 +10,12 @@ redis:
 jwt:
   enabled: true
   authUrl: http://localhost:9060
+  jwksPath: /auth/public-keys
   issuer: birbank-business
   audience: birbank-business
+  validMethods:
+    - RS256
+  sessionKeyPrefix: "session:revoked:"
 
 routes:
   - id: ms-auth
@@ -27,6 +31,12 @@ routes:
 rateLimit:
   rate: 100
   window: 1s
+  keyPrefix: "ratelimit:"
+  keyHeaders:
+    - header: X-DEVICE-ID
+      prefix: device
+    - header: USERNAME
+      prefix: user
 
 circuitBreaker:
   maxRequests: 5

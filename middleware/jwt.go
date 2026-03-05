@@ -9,7 +9,6 @@ import (
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/redis/go-redis/v9"
 
 	"gw-go/config"
 )
@@ -41,19 +40,27 @@ func ClaimsFromContext(ctx context.Context) *Claims {
 	return c
 }
 
+// ContextWithClaims returns a new context with the given claims attached.
+func ContextWithClaims(ctx context.Context, c *Claims) context.Context {
+	return context.WithValue(ctx, claimsCtxKey, c)
+}
+
 // Auth validates JWT tokens via JWKS and checks session revocation in Redis.
 type Auth struct {
 	cfg    config.JWT
-	rdb    *redis.Client
+	rdb    RedisClient
 	bypass []string
 	jwks   keyfunc.Keyfunc
 }
 
-func NewAuth(cfg config.JWT, rdb *redis.Client, bypass []string) (*Auth, error) {
+func NewAuth(cfg config.JWT, rdb RedisClient, bypass []string) (*Auth, error) {
 	a := &Auth{cfg: cfg, rdb: rdb, bypass: bypass}
 
 	if cfg.Enabled {
-		jwksURL := strings.TrimRight(cfg.AuthURL, "/") + "/internal/auth/jwks"
+		if cfg.JwksPath == "" {
+			return nil, fmt.Errorf("jwt.jwksPath is required when jwt is enabled")
+		}
+		jwksURL := strings.TrimRight(cfg.AuthURL, "/") + "/" + strings.TrimLeft(cfg.JwksPath, "/")
 		k, err := keyfunc.NewDefault([]string{jwksURL})
 		if err != nil {
 			return nil, fmt.Errorf("initializing JWKS from %s: %w", jwksURL, err)
@@ -84,7 +91,7 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 		token, err := jwt.ParseWithClaims(raw, &claims, a.jwks.Keyfunc,
 			jwt.WithIssuer(a.cfg.Issuer),
 			jwt.WithAudience(a.cfg.Audience),
-			jwt.WithValidMethods([]string{"RS256"}),
+			jwt.WithValidMethods(a.cfg.ValidMethods),
 		)
 		if err != nil || !token.Valid {
 			slog.Warn("auth failed", "err", err, "path", r.URL.Path)
@@ -108,7 +115,7 @@ func (a *Auth) checkRevoked(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
 		return nil
 	}
-	exists, err := a.rdb.Exists(ctx, "session:revoked:"+sessionID).Result()
+	exists, err := a.rdb.Exists(ctx, a.cfg.SessionKeyPrefix+sessionID).Result()
 	if err != nil {
 		slog.Warn("redis revocation check failed", "err", err)
 		return nil // fail open

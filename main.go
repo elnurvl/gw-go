@@ -21,10 +21,16 @@ func main() {
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()
 
-	cfg, err := config.Load(*cfgPath)
-	if err != nil {
-		slog.Error("failed to load config", "err", err)
+	if err := run(*cfgPath); err != nil {
+		slog.Error("fatal", "err", err)
 		os.Exit(1)
+	}
+}
+
+func run(cfgPath string) error {
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
 	}
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
@@ -44,8 +50,7 @@ func main() {
 
 	auth, err := middleware.NewAuth(cfg.JWT, rdb, cfg.BypassPaths)
 	if err != nil {
-		slog.Error("failed to init auth", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("initializing auth: %w", err)
 	}
 
 	// Middleware chain (outermost → innermost):
@@ -78,16 +83,15 @@ func main() {
 	case sig := <-sigCh:
 		slog.Info("shutting down", "signal", sig)
 	case err := <-errCh:
-		slog.Error("server error", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("server error: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Server.ShutdownTimeout)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
-		slog.Error("shutdown error", "err", err)
-		os.Exit(1)
+		return fmt.Errorf("shutdown: %w", err)
 	}
 	slog.Info("gateway stopped")
+	return nil
 }

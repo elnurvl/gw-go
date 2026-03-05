@@ -1,11 +1,20 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/redis/go-redis/v9"
 )
+
+// RedisClient abstracts the Redis operations used by middleware.
+type RedisClient interface {
+	redis.Scripter
+	Exists(ctx context.Context, keys ...string) *redis.IntCmd
+}
 
 // ClientIP resolves the originating client IP from proxy headers,
 // falling back to the network-level remote address.

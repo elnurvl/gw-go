@@ -28,13 +28,21 @@ return 1
 `)
 
 type RateLimiter struct {
-	rdb    *redis.Client
-	rate   int
-	window time.Duration
+	rdb        RedisClient
+	rate       int
+	window     time.Duration
+	keyPrefix  string
+	keyHeaders []config.KeyHeader
 }
 
-func NewRateLimiter(rdb *redis.Client, cfg config.RateLimit) *RateLimiter {
-	return &RateLimiter{rdb: rdb, rate: cfg.Rate, window: cfg.Window}
+func NewRateLimiter(rdb RedisClient, cfg config.RateLimit) *RateLimiter {
+	return &RateLimiter{
+		rdb:        rdb,
+		rate:       cfg.Rate,
+		window:     cfg.Window,
+		keyPrefix:  cfg.KeyPrefix,
+		keyHeaders: cfg.KeyHeaders,
+	}
 }
 
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
@@ -43,7 +51,7 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 
 		allowed, err := rateLimitScript.Run(
 			r.Context(), rl.rdb,
-			[]string{"ratelimit:" + key},
+			[]string{rl.keyPrefix + key},
 			rl.rate, rl.window.Milliseconds(),
 		).Int64()
 
@@ -63,13 +71,12 @@ func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// resolveKey determines the rate-limit bucket: device ID → username → client IP.
+// resolveKey determines the rate-limit bucket using configured header priority, falling back to client IP.
 func (rl *RateLimiter) resolveKey(r *http.Request) string {
-	if v := r.Header.Get("X-DEVICE-ID"); v != "" {
-		return "device:" + v
-	}
-	if v := r.Header.Get("USERNAME"); v != "" {
-		return "user:" + v
+	for _, kh := range rl.keyHeaders {
+		if v := r.Header.Get(kh.Header); v != "" {
+			return kh.Prefix + ":" + v
+		}
 	}
 	return "ip:" + ClientIP(r)
 }
