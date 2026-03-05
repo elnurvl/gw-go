@@ -100,7 +100,7 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 		}
 
 		if err := a.checkRevoked(r.Context(), claims.SessionID); err != nil {
-			writeJSON(w, http.StatusUnauthorized, errBody("session revoked"))
+			writeJSON(w, http.StatusUnauthorized, errBody("token revoked"))
 			return
 		}
 
@@ -109,19 +109,19 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// --- session revocation ---
+// --- token revocation ---
 
 func (a *Auth) checkRevoked(ctx context.Context, sessionID string) error {
 	if sessionID == "" {
 		return nil
 	}
-	exists, err := a.rdb.Exists(ctx, a.cfg.SessionKeyPrefix+sessionID).Result()
+	exists, err := a.rdb.Exists(ctx, a.cfg.RevokedTokenPrefix+sessionID).Result()
 	if err != nil {
 		slog.Warn("redis revocation check failed", "err", err)
 		return nil // fail open
 	}
 	if exists > 0 {
-		return fmt.Errorf("session %s revoked", sessionID)
+		return fmt.Errorf("token %s revoked", sessionID)
 	}
 	return nil
 }

@@ -123,13 +123,13 @@ func buildIntegrationGateway(t *testing.T, rdb *redis.Client) http.Handler {
 	addr := msAuthURL()
 	cfg := &config.Config{
 		JWT: config.JWT{
-			Enabled:          true,
-			AuthURL:          addr,
-			JwksPath:         "/auth/public-keys",
-			Issuer:           msAuthIssuer,
-			Audience:         msAuthAud,
-			ValidMethods:     []string{"RS256"},
-			SessionKeyPrefix: "session:revoked:",
+			Enabled:            true,
+			AuthURL:            addr,
+			JwksPath:           "/auth/public-keys",
+			Issuer:             msAuthIssuer,
+			Audience:           msAuthAud,
+			ValidMethods:       []string{"RS256"},
+			RevokedTokenPrefix: "token:revoked:",
 		},
 		Routes: []config.Route{
 			{ID: "ms-auth", PathPrefix: "/w/auth", Upstream: addr, StripPrefix: 1},
@@ -387,13 +387,13 @@ func TestIntegration_SessionRevocation(t *testing.T) {
 	if w.Code == http.StatusUnauthorized {
 		var body map[string]string
 		json.Unmarshal(w.Body.Bytes(), &body)
-		if body["message"] == "session revoked" {
+		if body["message"] == "token revoked" {
 			t.Fatal("session should not be revoked yet")
 		}
 	}
 
 	// Revoke session in Redis
-	err := rdb.Set(context.Background(), "session:revoked:"+sessionID, "1", time.Minute).Err()
+	err := rdb.Set(context.Background(), "token:revoked:"+sessionID, "1", time.Minute).Err()
 	if err != nil {
 		t.Fatalf("redis SET: %v", err)
 	}
@@ -409,8 +409,8 @@ func TestIntegration_SessionRevocation(t *testing.T) {
 	}
 	var body map[string]string
 	json.Unmarshal(w.Body.Bytes(), &body)
-	if body["message"] != "session revoked" {
-		t.Errorf("message = %q, want 'session revoked'", body["message"])
+	if body["message"] != "token revoked" {
+		t.Errorf("message = %q, want 'token revoked'", body["message"])
 	}
 }
 
@@ -424,7 +424,7 @@ func TestIntegration_SessionRevocation_Cleared(t *testing.T) {
 	token := signMSAuthToken(t, key, sessionID)
 
 	// Revoke
-	rdb.Set(context.Background(), "session:revoked:"+sessionID, "1", time.Minute)
+	rdb.Set(context.Background(), "token:revoked:"+sessionID, "1", time.Minute)
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/w/auth/user-info", nil)
@@ -435,7 +435,7 @@ func TestIntegration_SessionRevocation_Cleared(t *testing.T) {
 	}
 
 	// Un-revoke
-	rdb.Del(context.Background(), "session:revoked:"+sessionID)
+	rdb.Del(context.Background(), "token:revoked:"+sessionID)
 
 	// Should pass gateway auth again
 	w = httptest.NewRecorder()
@@ -447,7 +447,7 @@ func TestIntegration_SessionRevocation_Cleared(t *testing.T) {
 	if w.Code == http.StatusUnauthorized {
 		var body map[string]string
 		json.Unmarshal(w.Body.Bytes(), &body)
-		if body["message"] == "session revoked" {
+		if body["message"] == "token revoked" {
 			t.Error("session should no longer be revoked")
 		}
 	}

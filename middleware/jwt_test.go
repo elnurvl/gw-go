@@ -55,12 +55,12 @@ func testAuth(t *testing.T, rdb RedisClient, bypass []string) (*Auth, *rsa.Priva
 	}
 
 	cfg := config.JWT{
-		Enabled:          true,
-		AuthURL:          jwksServer.URL,
-		Issuer:           "test-issuer",
-		Audience:         "test-audience",
-		ValidMethods:     []string{"RS256"},
-		SessionKeyPrefix: "session:revoked:",
+		Enabled:            true,
+		AuthURL:            jwksServer.URL,
+		Issuer:             "test-issuer",
+		Audience:           "test-audience",
+		ValidMethods:       []string{"RS256"},
+		RevokedTokenPrefix: "token:revoked:",
 	}
 
 	return &Auth{cfg: cfg, rdb: rdb, bypass: bypass, jwks: k}, privateKey
@@ -404,7 +404,7 @@ func TestAuth_RevokedSession(t *testing.T) {
 
 	// Mark session as revoked
 	sessionID := "sess-revoked-123"
-	mock.keys["session:revoked:"+sessionID] = true
+	mock.keys["token:revoked:"+sessionID] = true
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called for revoked session")
@@ -426,8 +426,8 @@ func TestAuth_RevokedSession(t *testing.T) {
 	}
 	var body map[string]string
 	json.Unmarshal(w.Body.Bytes(), &body)
-	if body["message"] != "session revoked" {
-		t.Errorf("message = %q, want 'session revoked'", body["message"])
+	if body["message"] != "token revoked" {
+		t.Errorf("message = %q, want 'token revoked'", body["message"])
 	}
 }
 
@@ -453,7 +453,7 @@ func TestAuth_CheckRevoked_NotRevoked(t *testing.T) {
 
 func TestAuth_CheckRevoked_RedisDown_FailOpen(t *testing.T) {
 	mock := errMockRedis()
-	auth := &Auth{cfg: config.JWT{SessionKeyPrefix: "session:revoked:"}, rdb: mock}
+	auth := &Auth{cfg: config.JWT{RevokedTokenPrefix: "token:revoked:"}, rdb: mock}
 
 	err := auth.checkRevoked(context.Background(), "some-session")
 	if err != nil {
@@ -545,13 +545,13 @@ func TestNewAuth_Enabled(t *testing.T) {
 	defer jwksServer.Close()
 
 	cfg := config.JWT{
-		Enabled:          true,
-		AuthURL:          jwksServer.URL,
-		JwksPath:         "/",
-		Issuer:           "test",
-		Audience:         "test",
-		ValidMethods:     []string{"RS256"},
-		SessionKeyPrefix: "session:revoked:",
+		Enabled:            true,
+		AuthURL:            jwksServer.URL,
+		JwksPath:           "/",
+		Issuer:             "test",
+		Audience:           "test",
+		ValidMethods:       []string{"RS256"},
+		RevokedTokenPrefix: "token:revoked:",
 	}
 	auth, err := NewAuth(cfg, newMockRedis(), []string{"/health"})
 	if err != nil {
@@ -592,7 +592,7 @@ func TestAuth_DifferentKeyID_Rejected(t *testing.T) {
 
 	k, _ := keyfunc.NewDefault([]string{jwksServer.URL})
 	auth := &Auth{
-		cfg:    config.JWT{Enabled: true, Issuer: "test-issuer", Audience: "test-audience", ValidMethods: []string{"RS256"}, SessionKeyPrefix: "session:revoked:"},
+		cfg:    config.JWT{Enabled: true, Issuer: "test-issuer", Audience: "test-audience", ValidMethods: []string{"RS256"}, RevokedTokenPrefix: "token:revoked:"},
 		rdb:    mock,
 		jwks:   k,
 		bypass: nil,

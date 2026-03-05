@@ -35,13 +35,13 @@ type Redis struct {
 }
 
 type JWT struct {
-	Enabled          bool     `yaml:"enabled"`
-	AuthURL          string   `yaml:"authUrl"`
-	JwksPath         string   `yaml:"jwksPath"`
-	Issuer           string   `yaml:"issuer"`
-	Audience         string   `yaml:"audience"`
-	ValidMethods     []string `yaml:"validMethods"`
-	SessionKeyPrefix string   `yaml:"sessionKeyPrefix"`
+	Enabled            bool     `yaml:"enabled"`
+	AuthURL            string   `yaml:"authUrl"`
+	JwksPath           string   `yaml:"jwksPath"`
+	Issuer             string   `yaml:"issuer"`
+	Audience           string   `yaml:"audience"`
+	ValidMethods       []string `yaml:"validMethods"`
+	RevokedTokenPrefix string   `yaml:"revokedTokenPrefix"`
 }
 
 type Route struct {
@@ -129,9 +129,9 @@ func defaults() *Config {
 		},
 		Redis: Redis{Addr: "localhost:6379"},
 		JWT: JWT{
-			Enabled:          true,
-			ValidMethods:     []string{"RS256"},
-			SessionKeyPrefix: "session:revoked:",
+			Enabled:            true,
+			ValidMethods:       []string{"RS256"},
+			RevokedTokenPrefix: "token:revoked:",
 		},
 		RateLimit: RateLimit{
 			Rate:      100,

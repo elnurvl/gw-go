@@ -31,8 +31,8 @@ func TestDefaults(t *testing.T) {
 	if len(cfg.JWT.ValidMethods) != 1 || cfg.JWT.ValidMethods[0] != "RS256" {
 		t.Errorf("default jwt.validMethods = %v, want [RS256]", cfg.JWT.ValidMethods)
 	}
-	if cfg.JWT.SessionKeyPrefix != "session:revoked:" {
-		t.Errorf("default jwt.sessionKeyPrefix = %q, want session:revoked:", cfg.JWT.SessionKeyPrefix)
+	if cfg.JWT.RevokedTokenPrefix != "token:revoked:" {
+		t.Errorf("default jwt.revokedTokenPrefix = %q, want token:revoked:", cfg.JWT.RevokedTokenPrefix)
 	}
 	if cfg.RateLimit.Rate != 100 {
 		t.Errorf("default rate = %d, want 100", cfg.RateLimit.Rate)

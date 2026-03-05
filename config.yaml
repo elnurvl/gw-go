@@ -15,7 +15,7 @@ jwt:
   audience: ${AUDIENCE}
   validMethods:
     - RS256
-  sessionKeyPrefix: "session:revoked:"
+  revokedTokenPrefix: "token:revoked:"
 
 routes:
   - id: ms-auth
